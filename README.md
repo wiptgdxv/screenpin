@@ -1,6 +1,6 @@
 # 映刻 Screenpin
 
-映刻是 Windows 桌面截图工具。平时可收在托盘，用全局快捷键截图、贴图、截长图和录屏。
+映刻 Screenpin 是一款使用 Go 和 [MyGo](https://github.com/egoist/mygo) 原生 UI 开发的 Windows 截图、贴图和录屏工具。平时可收在托盘，用全局快捷键截图、贴图、截长图和录屏。
 
 [![映刻 Screenpin 产品介绍](docs/media/screenpin-intro-cover.png)](docs/media/screenpin-intro.mp4)
 
