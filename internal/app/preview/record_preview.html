@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; media-src 'self'; script-src 'self'">
+<title>录屏预览</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { --surface:#e8eef1; --text:#20333c; --muted:#4b626d; --line:#aebfc7; --hover:#cddde3; --accent:#216679;
+    display:grid; grid-template-rows:45px minmax(0,1fr); grid-template-columns:minmax(0,1fr); background:var(--surface); color:var(--text);
+    font:13px "Microsoft YaHei UI", system-ui, sans-serif; }
+  .glass body { --matte:color-mix(in srgb,#d5e1e7 var(--glass-density,18%),var(--surface));
+    background:color-mix(in srgb,var(--matte) var(--glass-tint,64%),transparent); }
+  header { display:flex; align-items:center; gap:14px; padding:0 10px 0 17px; user-select:none; --app-region:drag; }
+  .heading { display:flex; align-items:center; gap:8px; white-space:nowrap; }
+  .heading svg { color:var(--accent); }
+  h1 { margin:0; font-size:13px; font-weight:650; }
+  .file-info { display:flex; align-items:center; gap:9px; margin-left:auto; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .file-info span + span { padding-left:9px; border-left:1px solid var(--line); }
+  nav { display:flex; gap:5px; align-items:center; }
+  a, button, select { color:inherit; font:inherit; border:0; border-radius:5px; background:transparent; }
+  a { text-decoration:none; white-space:nowrap; }
+  a:hover, button:hover, select:hover { background:var(--hover); }
+  .window-actions { gap:2px; --app-region:no-drag; }
+  .window-actions a { display:grid; place-items:center; width:28px; height:26px; }
+  .window-actions a[href="close"]:hover { background:#e7c7cb; color:#6b2630; }
+  svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .window-actions svg { width:13px; height:13px; }
+  #stage { display:grid; grid-template-rows:minmax(0,1fr) auto; grid-template-columns:minmax(0,1fr); min-width:0; min-height:0; padding:0 16px 12px; }
+  video { display:block; width:100%; height:100%; min-height:0; object-fit:contain; border-radius:7px; background:#d3dee3; }
+  #stage:fullscreen { padding:0; background:var(--surface); }
+  .glass #stage:not(:fullscreen) video { background:rgba(211,222,227,var(--glass-stage-tint,.46)); }
+  .glass .transport-row { border-top-color:rgba(139,157,166,.42); }
+  #stage:fullscreen video { border-radius:0; background:#101c22; }
+  #stage:fullscreen :is(.export-actions,.edit-row) { display:none; }
+  #transport { min-width:0; padding:10px 3px 0; }
+  #close-confirmation { width:min(384px,calc(100% - 32px)); padding:22px; color:var(--text);
+    background:#f3f6f7; border:1px solid #c4d0d6; border-radius:10px; }
+  #close-confirmation::backdrop { background:rgba(23,37,45,.36); }
+  #close-confirmation h2 { margin:0 0 8px; font-size:18px; }
+  #close-confirmation p { margin:0; color:var(--muted); line-height:1.55; }
+  .confirm-actions { justify-content:flex-end; margin-top:20px; gap:8px; }
+  .confirm-actions button { display:block; width:auto; height:34px; padding:0 12px; }
+  #keep-preview { background:var(--accent); color:white; }
+  #keep-preview:hover { background:#1b5768; }
+  #discard-preview { color:#8a3039; }
+  #discard-preview:hover { background:#f1dee0; }
+  #transport :is(.player-controls,#seek)[hidden] { display:none; }
+  #seek { appearance:none; display:block; width:100%; margin:0; height:12px; background:transparent; cursor:pointer; }
+  #seek::-webkit-slider-runnable-track { height:3px; border-radius:2px;
+    background:linear-gradient(to right,var(--accent) var(--progress,0%),#a9bdc7 var(--progress,0%)); }
+  #seek::-webkit-slider-thumb { appearance:none; width:9px; height:9px; margin-top:-3px; border-radius:50%; background:var(--accent); }
+  .transport-row, .player-controls { display:flex; align-items:center; min-width:0; gap:6px; }
+  .transport-row { min-height:42px; border-top:1px solid #c8d4da; padding-top:5px; }
+  #clock, #status { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #clock { margin:0 7px 0 1px; }
+  #status { flex:1 1 0; min-width:0; margin-left:8px; overflow:hidden; text-overflow:ellipsis; text-align:right; }
+  button { display:grid; place-items:center; width:29px; height:28px; cursor:pointer; }
+  #play { background:#ccdce2; color:#204c5b; }
+  #play:hover { background:#bed3dc; }
+  #sound[aria-pressed="true"] { color:var(--muted); }
+  #volume { width:49px; margin:0 2px 0 -4px; accent-color:var(--accent); }
+  select { padding:3px; }
+  .export-actions { margin-left:auto; min-width:0; }
+  .export-actions [hidden] { display:none; }
+  .edit-row { display:flex; align-items:center; min-width:0; gap:6px; padding:3px 0; }
+  .edit-row button { display:block; flex:none; width:auto; padding:0 7px; }
+  #trim-label { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #seek.trimmed::-webkit-slider-runnable-track { background:linear-gradient(to right,#a9bdc7 0 var(--start,0%),var(--accent) var(--start,0%) var(--end,100%),#a9bdc7 var(--end,100%) 100%); }
+  .export-actions a { padding:7px 9px; }
+  a.primary { background:var(--accent); color:#fff; }
+  a.primary:hover { background:#1b5768; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  @media (max-width:650px) {
+    #volume { width:35px; }
+    .transport-row, .player-controls { gap:4px; }
+  }
+  @media (max-width:610px) {
+    #stage { padding-inline:9px; }
+    header { padding-left:10px; gap:8px; }
+  }
+</style>
+<header>
+  <div class="heading">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M6.5 5.5 10 8l-3.5 2.5z"/></svg>
+    <h1>录屏预览</h1>
+  </div>
+  <div class="file-info"><span id="resolution">—</span><span>MP4</span><span id="audio-description"></span></div>
+  <nav class="window-actions" aria-label="窗口控制">
+    <a href="minimize" aria-label="最小化" title="最小化"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 10h10"/></svg></a>
+    <a href="maximize" aria-label="最大化或还原" title="最大化或还原"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx=".5"/></svg></a>
+    <a href="close" aria-label="关闭预览" title="关闭预览"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8"/></svg></a>
+  </nav>
+</header>
+<main id="stage">
+  <video src="video" controls controlslist="nodownload noremoteplayback" preload="metadata" aria-label="录屏回放"></video>
+  <section id="transport" aria-label="播放控制">
+    <input id="seek" hidden type="range" min="0" max="1" step="0.01" value="0" aria-label="播放进度">
+    <div class="edit-row" aria-label="裁剪首尾">
+      <button id="mark-in" type="button" disabled>设为起点</button>
+      <button id="mark-out" type="button" disabled>设为终点</button>
+      <button id="reset-trim" type="button" disabled>重置</button>
+      <output id="trim-label">保留整段</output>
+      <span id="status" role="status">未保存</span>
+    </div>
+    <div class="transport-row">
+      <div class="player-controls" hidden>
+      <button id="play" type="button" title="播放" aria-label="播放">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path id="play-shape" d="M5 3l8 5-8 5z"/></svg>
+      </button>
+      <span id="clock">00:00 / 00:00</span>
+      <button id="sound" type="button" aria-label="静音" title="静音" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l3-3v10L5 10H2z"/><path id="sound-shape" d="M10.5 6a3 3 0 0 1 0 4m2-6a5.7 5.7 0 0 1 0 8"/></svg>
+      </button>
+      <input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="播放音量">
+      <select id="rate" aria-label="播放速度" title="播放速度">
+        <option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+      </select>
+      <button id="fullscreen" type="button" title="全屏" aria-label="全屏">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4"/></svg>
+      </button>
+      </div>
+      <nav class="export-actions" aria-label="录屏操作">
+        <select id="export-format" aria-label="导出格式" title="GIF 和 WebP 不含声音">
+          <option value="mp4">MP4</option><option value="gif">GIF</option><option value="webp">WebP</option>
+        </select>
+        <a id="save-as" href="save-as">另存为</a><a id="save" class="primary" href="save">保存 MP4</a>
+      </nav>
+    </div>
+  </section>
+</main>
+<dialog id="close-confirmation" aria-labelledby="close-heading" aria-describedby="close-detail">
+  <h2 id="close-heading">录屏还未保存</h2>
+  <p id="close-detail">继续预览可以保存这段录屏。丢弃后无法恢复。</p>
+  <nav class="confirm-actions" aria-label="关闭录屏预览">
+    <button id="discard-preview" type="button">丢弃录屏</button>
+    <button id="keep-preview" type="button" autofocus>继续预览</button>
+  </nav>
+</dialog>
+<script src="player.js" defer></script>
+</html>

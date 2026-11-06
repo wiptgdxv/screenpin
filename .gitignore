@@ -1,0 +1,6 @@
+/artifacts/
+/*.exe
+/tools/ffmpeg/*.exe
+/tools/wechat-ocr/
+/tools/wechat-ocr-src/bin/
+/tools/wechat-ocr-src/obj/
