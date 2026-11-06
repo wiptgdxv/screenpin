@@ -4,7 +4,7 @@
 
 [![映刻 Screenpin 产品介绍](docs/media/screenpin-intro-cover.png)](docs/media/screenpin-intro.mp4)
 
-[观看 43 秒中文介绍视频（无声 MP4）](docs/media/screenpin-intro.mp4)
+[观看 31 秒中文操作演示（无声 MP4）](docs/media/screenpin-intro.mp4)
 
 当前支持 Windows 区域截图、截图自动复制与临时贴图、图钉固定、选区滚动截图、选区 MP4 录屏、后台快捷键、托盘常驻、单实例及 PNG 图片处理。
 
